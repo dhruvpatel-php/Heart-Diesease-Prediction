@@ -2,15 +2,19 @@ name: Streamlit Keep-Alive
 
 on:
   schedule:
-    # Run every 12 hours (00:00 and 12:00 UTC)
-    - cron: '0 */12 * * *'
+    # Runs every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
+    - cron: '0 */6 * * *'
   workflow_dispatch: # Enable manual run from GitHub Actions UI
+
+permissions:
+  contents: write
+  actions: write
 
 jobs:
   keep-alive:
-    name: Wake & Ping Streamlit Cloud
+    name: Wake & Ping Streamlit Cloud Apps
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout Repository
@@ -21,14 +25,19 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Playwright & Chromium
+      - name: Install Playwright & Headless Chromium
         run: |
           python -m pip install --upgrade pip
           pip install playwright
           playwright install --with-deps chromium
 
+      # Issue 1 Solution: Automatically checks all 5 Streamlit apps and wakes up any sleeping apps
       - name: Run Keep-Alive Script
-        env:
-          STREAMLIT_APP_URL: "https://heart-diesease-prediction-by-dhruvv.streamlit.app/"
         run: |
           python scripts/keep_alive.py
+
+      # Issue 2 Solution: Prevents GitHub from disabling scheduled cron jobs after 60 days of inactivity
+      - name: Prevent GitHub Workflow Inactivity Auto-Disable
+        uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          use_api: true

@@ -5,22 +5,33 @@ Wakes up sleeping Streamlit Community Cloud apps via Headless Chromium.
 =============================================================================
 """
 
+import os
 import sys
 import time
 from playwright.sync_api import sync_playwright
 
-# Monitored Streamlit Applications
-URLS = [
+# Monitored Streamlit Applications (All 5 user apps)
+DEFAULT_URLS = [
+    "https://heart-diesease-prediction-by-dhruvv.streamlit.app/",
     "https://texas-salary-prediction.streamlit.app",
     "https://customer-transaction-prediction.streamlit.app",
-    "https://heart-diesease-prediction-by-dhruvv.streamlit.app/",
     "https://home-loan-default-prediction-by-dhruv.streamlit.app/",
     "https://incident-intelligence.streamlit.app/"
 ]
 
-def wake_app(page, url: str):
-    print(f"\n" + "=" * 55)
-    print(f"[CHECKING] {url}")
+def get_target_urls():
+    env_url = os.environ.get("STREAMLIT_APP_URL", "").strip()
+    urls = list(DEFAULT_URLS)
+    if env_url:
+        for u in env_url.splitlines():
+            u = u.strip()
+            if u and u not in urls:
+                urls.append(u)
+    return urls
+
+def probe_and_wake(page, url: str):
+    print("\n" + "=" * 60)
+    print(f"[PROBING] {url}")
     try:
         response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
         status_code = response.status if response else "Unknown"
@@ -30,9 +41,8 @@ def wake_app(page, url: str):
         page.wait_for_timeout(6000)
         
         # Inspect page content for sleep indicator phrases
-        body_text = page.inner_text("body")
-        
-        is_asleep = any(phrase in body_text.lower() for phrase in [
+        content = page.content().lower()
+        is_asleep = any(phrase in content for phrase in [
             "gone to sleep", "zzzz", "due to inactivity", "wake it back up"
         ])
         
@@ -45,6 +55,7 @@ def wake_app(page, url: str):
                 "button:has-text('get this app back up')",
                 "button:has-text('Yes, get this app back up!')",
                 "button:has-text('wake')",
+                "button[kind='primary']",
                 "button"
             ]
             
@@ -57,8 +68,8 @@ def wake_app(page, url: str):
             if wake_btn:
                 wake_btn.click()
                 print("  [ACTION] Clicked 'Yes, get this app back up!' button.")
-                print("  [WAITING] Allowing 12 seconds for Streamlit container spin-up...")
-                page.wait_for_timeout(12000)
+                print("  [WAITING] Allowing 15 seconds for Streamlit container spin-up...")
+                page.wait_for_timeout(15000)
                 print("  [SUCCESS] Wake-up signal dispatched successfully!")
             else:
                 print("  [WARNING] Sleep text found, but wake-up button not located.")
@@ -69,8 +80,11 @@ def wake_app(page, url: str):
         print(f"  [PROBE RESULT] Finished checking {url}: {e}")
 
 def main():
+    urls = get_target_urls()
     print("[START] Streamlit Keep-Alive Automation Initialized")
-    print(f"[INFO] Monitoring {len(URLS)} applications...")
+    print(f"[CONFIG] Monitoring {len(urls)} Streamlit applications:")
+    for u in urls:
+        print(f"  - {u}")
     
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -83,12 +97,12 @@ def main():
         )
         page = context.new_page()
         
-        for url in URLS:
-            wake_app(page, url)
+        for url in urls:
+            probe_and_wake(page, url)
             
         browser.close()
         
-    print("\n" + "=" * 55)
+    print("\n" + "=" * 60)
     print("[COMPLETED] All 5 Streamlit applications checked and kept alive.")
 
 if __name__ == "__main__":
