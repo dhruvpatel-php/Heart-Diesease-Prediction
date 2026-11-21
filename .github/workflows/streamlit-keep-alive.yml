@@ -26,6 +26,9 @@ jobs:
           app-urls: |
             https://texas-salary-prediction.streamlit.app
             https://customer-transaction-prediction.streamlit.app
+            https://heart-diesease-prediction-by-dhruvv.streamlit.app/
+            https://home-loan-default-prediction-by-dhruv.streamlit.app/
+            https://incident-intelligence.streamlit.app/
           timeout: 90
 
       # Issue 2 Solution: Prevents GitHub from disabling scheduled cron jobs after 60 days of inactivity
