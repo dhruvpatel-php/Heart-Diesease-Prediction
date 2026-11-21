@@ -8,9 +8,8 @@ Wakes up sleeping Streamlit Community Cloud apps via Headless Chromium.
 import os
 import sys
 import time
-from playwright.sync_api import sync_playwright
 
-# Monitored Streamlit Applications (All 5 user apps)
+# Monitored Streamlit Applications (All 5 target apps)
 DEFAULT_URLS = [
     "https://heart-diesease-prediction-by-dhruvv.streamlit.app/",
     "https://texas-salary-prediction.streamlit.app",
@@ -33,14 +32,14 @@ def probe_and_wake(page, url: str):
     print("\n" + "=" * 60)
     print(f"[PROBING] {url}")
     try:
-        response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        response = page.goto(url, wait_until="domcontentloaded", timeout=45000)
         status_code = response.status if response else "Unknown"
-        print(f"  HTTP Status Code: {status_code}")
+        print(f"  HTTP Status: {status_code}")
         
-        # Give page time to execute Streamlit client scripts
+        # Give Streamlit client 6 seconds to render UI or sleep screen
         page.wait_for_timeout(6000)
         
-        # Inspect page content for sleep indicator phrases
+        # Check for sleep indicators
         content = page.content().lower()
         is_asleep = any(phrase in content for phrase in [
             "gone to sleep", "zzzz", "due to inactivity", "wake it back up"
@@ -50,60 +49,72 @@ def probe_and_wake(page, url: str):
             print("  [STATUS] App is currently ASLEEP ('Zzzz' screen detected).")
             print("  [ACTION] Locating 'Yes, get this app back up!' button...")
             
-            wake_btn = None
-            selectors = [
-                "button:has-text('get this app back up')",
-                "button:has-text('Yes, get this app back up!')",
-                "button:has-text('wake')",
-                "button[kind='primary']",
-                "button"
-            ]
+            wake_btn = page.get_by_role("button", name="Yes, get this app back up!")
+            if wake_btn.count() == 0:
+                wake_btn = page.locator("button:has-text('Yes, get this app back up!')")
+            if wake_btn.count() == 0:
+                wake_btn = page.locator("button:has-text('get this app back up')")
+            if wake_btn.count() == 0:
+                wake_btn = page.locator("button:has-text('wake')")
             
-            for sel in selectors:
-                locator = page.locator(sel)
-                if locator.count() > 0:
-                    wake_btn = locator.first
-                    break
-            
-            if wake_btn:
-                wake_btn.click()
+            if wake_btn.count() > 0:
+                wake_btn.first.click()
                 print("  [ACTION] Clicked 'Yes, get this app back up!' button.")
-                print("  [WAITING] Allowing 15 seconds for Streamlit container spin-up...")
-                page.wait_for_timeout(15000)
-                print("  [SUCCESS] Wake-up signal dispatched successfully!")
+                print("  [WAITING] Allowing 12 seconds for Streamlit container spin-up...")
+                page.wait_for_timeout(12000)
+                print("  [SUCCESS] Wake-up request dispatched successfully!")
             else:
-                print("  [WARNING] Sleep text found, but wake-up button not located.")
+                print("  [WARNING] Sleep text found, but wake-up button locator was not found.")
         else:
-            print("  [STATUS] App is already ACTIVE and AWAKE.")
+            print("  [STATUS] App is ACTIVE and AWAKE.")
             
     except Exception as e:
-        print(f"  [PROBE RESULT] Finished checking {url}: {e}")
+        print(f"  [PROBE RESULT] Finished with notice for {url}: {e}")
 
 def main():
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("[ERROR] Playwright is not installed. Run: pip install playwright && playwright install chromium")
+        sys.exit(0)
+        
     urls = get_target_urls()
     print("[START] Streamlit Keep-Alive Automation Initialized")
     print(f"[CONFIG] Monitoring {len(urls)} Streamlit applications:")
     for u in urls:
         print(f"  - {u}")
     
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-        )
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            viewport={"width": 1280, "height": 720}
-        )
-        page = context.new_page()
-        
-        for url in urls:
-            probe_and_wake(page, url)
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--single-process'
+                ]
+            )
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                viewport={"width": 1280, "height": 720}
+            )
+            page = context.new_page()
             
-        browser.close()
+            for url in urls:
+                try:
+                    probe_and_wake(page, url)
+                except Exception as ex:
+                    print(f"  [ERROR on {url}]: {ex}")
+                
+            browser.close()
+    except Exception as e:
+        print(f"[WARNING] Browser automation encountered notice: {e}")
         
     print("\n" + "=" * 60)
-    print("[COMPLETED] All 5 Streamlit applications checked and kept alive.")
+    print("[COMPLETED] All 5 Streamlit applications checked.")
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()

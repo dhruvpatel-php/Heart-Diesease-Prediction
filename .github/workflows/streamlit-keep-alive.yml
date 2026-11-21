@@ -1,18 +1,18 @@
-name: Streamlit Keep-Alive
+name: Keep Streamlit Apps Awake
 
 on:
   schedule:
     # Runs every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
+    # Well within Streamlit Community Cloud inactivity sleep window
     - cron: '0 */6 * * *'
-  workflow_dispatch: # Enable manual run from GitHub Actions UI
+  workflow_dispatch: # Allows manual one-click execution from GitHub Actions tab
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
   keep-alive:
-    name: Wake & Ping Streamlit Cloud Apps
+    name: Wake Up & Keep Active
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -25,19 +25,25 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Playwright & Headless Chromium
+      # Issue 1 Solution: Automatically wakes up sleeping Streamlit apps using Headless Chromium
+      - name: Install Playwright & Chromium
         run: |
           python -m pip install --upgrade pip
           pip install playwright
-          playwright install --with-deps chromium
+          python -m playwright install --with-deps chromium
 
-      # Issue 1 Solution: Automatically checks all 5 Streamlit apps and wakes up any sleeping apps
-      - name: Run Keep-Alive Script
+      - name: Wake Up and Ping Streamlit Applications
         run: |
           python scripts/keep_alive.py
 
       # Issue 2 Solution: Prevents GitHub from disabling scheduled cron jobs after 60 days of inactivity
+      # Keeps repo active via native GitHub Actions bot commit without broken third-party actions
       - name: Prevent GitHub Workflow Inactivity Auto-Disable
-        uses: gautamkrishnar/keepalive-workflow@v2
-        with:
-          use_api: true
+        continue-on-error: true
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p .github
+          echo "Last keep-alive heartbeat: $(date -u)" > .github/keepalive.txt
+          git add .github/keepalive.txt
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: keep actions alive [skip ci]" && git push)
