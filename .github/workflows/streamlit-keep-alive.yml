@@ -6,6 +6,12 @@ on:
     # Well within Streamlit Community Cloud inactivity sleep window
     - cron: '0 */6 * * *'
   workflow_dispatch: # Allows manual one-click execution from GitHub Actions tab
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/**'
 
 permissions:
   contents: write
