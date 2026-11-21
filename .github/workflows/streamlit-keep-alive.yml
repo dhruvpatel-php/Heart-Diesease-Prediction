@@ -1,0 +1,35 @@
+name: Keep Streamlit Apps Awake
+
+on:
+  schedule:
+    # Runs every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
+    # Well within Streamlit Community Cloud inactivity sleep window
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Allows manual one-click execution from GitHub Actions tab
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  keep-alive:
+    name: Wake Up & Keep Active
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Issue 1 Solution: Automatically clicks "Yes, get this app back up!" button via headless browser
+      - name: Wake Up and Ping Streamlit Applications
+        uses: gpenessot/streamlit-keep-alive@v1
+        with:
+          app-urls: |
+            https://texas-salary-prediction.streamlit.app
+            https://customer-transaction-prediction.streamlit.app
+          timeout: 90
+
+      # Issue 2 Solution: Prevents GitHub from disabling scheduled cron jobs after 60 days of inactivity
+      - name: Prevent GitHub Workflow Inactivity Auto-Disable
+        uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          use_api: true
