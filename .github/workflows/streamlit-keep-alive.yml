@@ -19,17 +19,21 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Issue 1 Solution: Automatically clicks "Yes, get this app back up!" button via headless browser
-      - name: Wake Up and Ping Streamlit Applications
-        uses: gpenessot/streamlit-keep-alive@v1
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          app-urls: |
-            https://texas-salary-prediction.streamlit.app
-            https://customer-transaction-prediction.streamlit.app
-            https://heart-diesease-prediction-by-dhruvv.streamlit.app/
-            https://home-loan-default-prediction-by-dhruv.streamlit.app/
-            https://incident-intelligence.streamlit.app/
-          timeout: 90
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Playwright & Headless Chromium
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          playwright install --with-deps chromium
+
+      # Issue 1 Solution: Automatically wakes up all 5 Streamlit apps and auto-clicks "Yes, get this app back up!"
+      - name: Wake Up All Streamlit Apps
+        run: python wake_apps.py
 
       # Issue 2 Solution: Prevents GitHub from disabling scheduled cron jobs after 60 days of inactivity
       - name: Prevent GitHub Workflow Inactivity Auto-Disable
